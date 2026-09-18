@@ -68,12 +68,25 @@ def al_recibir_mensaje(client, userdata, msg):
         print(f"[puente] *** EVENTO PERDIDO *** {evento['id']} ({evento['data']['sensorId']}) no se pudo publicar en Kafka tras los reintentos: {exc}")
 
 
+def al_conectar(client, userdata, flags, rc):
+    if rc != 0:
+        print(f"[puente] conexion MQTT rechazada (rc={rc}), se reintentara")
+        return
+    client.subscribe("ot/tramo/+/sensor/+", qos=1)
+    print(f"[puente] conectado a {MQTT_HOST}:{MQTT_PORT}, suscrito a ot/tramo/+/sensor/+")
+
+
+def al_desconectar(client, userdata, rc):
+    if rc != 0:
+        print(f"[puente] conexion MQTT perdida (rc={rc}), reconectando...")
+
+
 def main() -> None:
     cliente = mqtt.Client(client_id="puente-ot-it")
+    cliente.on_connect = al_conectar
+    cliente.on_disconnect = al_desconectar
     cliente.on_message = al_recibir_mensaje
     cliente.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
-    cliente.subscribe("ot/tramo/+/sensor/+", qos=1)
-    print(f"[puente] escuchando ot/tramo/+/sensor/+ en {MQTT_HOST}:{MQTT_PORT}")
     print(f"[puente] publicando en {KAFKA_BROKERS}, topic {TOPIC_TELEMETRIA}")
     cliente.loop_forever()
 
