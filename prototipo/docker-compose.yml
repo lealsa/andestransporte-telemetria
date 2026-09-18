@@ -1,0 +1,150 @@
+name: andestransporte-integracion-telemetria
+
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.7
+    container_name: redpanda
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr redpanda:33145
+      - --advertise-rpc-addr redpanda:33145
+      - --mode dev-container
+      - --smp 1
+      - --default-log-level=info
+    ports:
+      - "18081:18081"
+      - "18082:18082"
+      - "19092:19092"
+      - "19644:9644"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:v2.7.2
+    container_name: redpanda-console
+    entrypoint: /bin/sh
+    command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
+    environment:
+      CONFIG_FILEPATH: /tmp/config.yml
+      CONSOLE_CONFIG_FILE: |
+        kafka:
+          brokers: ["redpanda:9092"]
+          schemaRegistry:
+            enabled: true
+            urls: ["http://redpanda:8081"]
+        redpanda:
+          adminApi:
+            enabled: true
+            urls: ["http://redpanda:9644"]
+    ports:
+      - "8080:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "1883:1883"
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -p 1883 -t '$$SYS/#' -C 1 -W 3 || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  simulador:
+    build: ./simulador
+    container_name: simulador-telemetria
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    environment:
+      PYTHONUNBUFFERED: "1"
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      TRAMOS: "tramo-14,tramo-22"
+      INTERVALO_SEG: "1"
+      INYECTAR_ANOMALIA_A_LOS_SEG: "90"
+      CONTROL_FILE: /control/anomalias.json
+    volumes:
+      - ./panel/control:/control
+
+  puente:
+    build: ./puente
+    container_name: puente-ot-it
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    environment:
+      PYTHONUNBUFFERED: "1"
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      KAFKA_BROKERS: redpanda:9092
+    volumes:
+      - ../schemas:/app/schemas:ro
+
+  detector:
+    build: ./detector
+    container_name: detector-anomalias
+    restart: unless-stopped
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      PYTHONUNBUFFERED: "1"
+      KAFKA_BROKERS: redpanda:9092
+      UMBRAL_PRESION_PCT: "10"
+      UMBRAL_BALANCE_M3H: "8"
+      LECTURAS_CONSECUTIVAS: "3"
+      TRAMOS_NOMINAL_PATH: /app/config/tramos-nominal.json
+    volumes:
+      - detector-data:/app/data
+      - ./detector/tramos-nominal.json:/app/config/tramos-nominal.json:ro
+
+  api:
+    build: ./api
+    container_name: api-estado-tramo
+    restart: unless-stopped
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      PYTHONUNBUFFERED: "1"
+      KAFKA_BROKERS: redpanda:9092
+      TRAMOS_NOMINAL_PATH: /app/config/tramos-nominal.json
+    volumes:
+      - ./detector/tramos-nominal.json:/app/config/tramos-nominal.json:ro
+    ports:
+      - "8090:8090"
+
+  camel:
+    build: ./camel
+    container_name: camel-integracion-balance
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      api:
+        condition: service_started
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    profiles: ["camel"]
+
+volumes:
+  detector-data:
