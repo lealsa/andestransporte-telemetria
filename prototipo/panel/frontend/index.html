@@ -4,222 +4,365 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Panel de Operación — AndesTransporte Telemetría</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0f1420;
-    --panel: #171d2b;
-    --panel-2: #1e2536;
-    --border: #2a3348;
-    --text: #e7ebf3;
-    --text-dim: #9aa4bd;
-    --accent: #4f8cff;
-    --ok: #35c078;
-    --warn: #f5a623;
-    --bad: #ef5c5c;
+    --bg: #161826;
+    --panel: #232532;
+    --panel-2: #3f424d;
+    --panel-3: #292b31;
+    --border: rgba(233,233,237,0.16);
+    --border-soft: rgba(233,233,237,0.10);
+    --text: #e9e9ed;
+    --text-dim: rgba(233,233,237,0.62);
+    --text-dimmer: rgba(233,233,237,0.4);
+    --accent: #9184d9;
+    --accent-dim: rgba(145,132,217,0.14);
+    --accent-dim-2: rgba(145,132,217,0.24);
+    --ok: #5fb894;
+    --ok-dim: rgba(95,184,148,0.16);
+    --bad: #e2726c;
+    --bad-dim: rgba(226,114,108,0.16);
+    --radius: 8px;
     --mono: "SF Mono", "Consolas", "Menlo", monospace;
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     margin: 0;
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
     background: var(--bg);
     color: var(--text);
-    padding: 24px 16px 64px;
+    font-size: 15px;
   }
-  .wrap { max-width: 980px; margin: 0 auto; }
-  h1 { font-size: 1.4rem; margin: 0 0 4px; }
-  .subt { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 24px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: #a99fe2; }
+  button:focus-visible, input:focus-visible, a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  header.topbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+    padding: 14px 24px;
+    background: rgba(22,24,38,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  header.topbar h1 { font-size: 1.05rem; margin: 0; font-weight: 500; letter-spacing: -0.01em; }
+  header.topbar .subt { color: var(--text-dimmer); font-size: 0.78rem; margin-top: 2px; }
+  .estado-globales { display: flex; gap: 10px; flex-wrap: wrap; }
+  .pill-estado {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.75rem; font-weight: 500; color: var(--text-dim);
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 5px 12px 5px 10px;
+  }
+  .punto { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--text-dimmer); }
+  .punto.on { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-dim); }
+  .punto.off { background: var(--text-dimmer); }
+  .punto.bad { background: var(--bad); box-shadow: 0 0 0 3px var(--bad-dim); }
+
+  .layout {
+    max-width: 1360px; margin: 0 auto;
+    padding: 20px 24px 24px;
+    display: grid;
+    grid-template-columns: minmax(0,1fr) 360px;
+    gap: 20px;
+    align-items: start;
+  }
+  .consolas-full { max-width: 1360px; margin: 0 auto; padding: 0 24px 64px; }
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: 1fr; }
+    aside.sidebar { position: static; }
+  }
+  main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  aside.sidebar { display: flex; flex-direction: column; gap: 20px; position: sticky; top: 78px; }
+
   .card {
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 18px 20px;
-    margin-bottom: 20px;
   }
   .card h2 {
-    font-size: 1.02rem;
-    margin: 0 0 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    font-size: 0.95rem; margin: 0 0 4px;
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 500; font-family: "Inter", sans-serif;
+  }
+  .card h2 .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 6px;
+    background: var(--accent-dim); color: var(--accent);
+    font-size: 0.72rem; font-weight: 600;
   }
   .card h2 .badge {
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: var(--panel-2);
-    color: var(--text-dim);
+    font-size: 0.68rem; font-weight: 600;
+    padding: 3px 9px; border-radius: 999px;
+    background: var(--panel-2); color: var(--text-dim);
+    border: 1px solid var(--border-soft);
+    margin-left: auto;
   }
-  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .card > .desc { color: var(--text-dimmer); font-size: 0.78rem; margin: 2px 0 14px; line-height: 1.5; }
+  .card > .desc code { background: var(--panel-3); padding: 1px 5px; border-radius: 4px; }
+
+  details.info { margin: 10px 0; }
+  details.info summary {
+    cursor: pointer; font-size: 0.76rem; color: var(--text-dim);
+    font-weight: 500; list-style: none; display: flex; align-items: center; gap: 6px;
+  }
+  details.info summary::before { content: "▸"; color: var(--accent); font-size: 0.7rem; transition: transform .15s; }
+  details.info[open] summary::before { transform: rotate(90deg); }
+  details.info summary::-webkit-details-marker { display: none; }
+  details.info .info-body {
+    font-size: 0.78rem; color: var(--text-dim); line-height: 1.6;
+    padding: 10px 0 2px 16px; border-left: 2px solid var(--border-soft); margin-top: 8px;
+  }
+  details.info .info-body p { margin: 0 0 10px; }
+  details.info .info-body code { background: var(--panel-3); padding: 1px 5px; border-radius: 4px; font-size: 0.85em; }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row + .row { margin-top: 10px; }
+
   button {
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 14px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    font-weight: 600;
+    background: transparent; color: var(--accent); border: 1px solid var(--accent);
+    border-radius: var(--radius); padding: 8px 14px; font-size: 0.82rem; cursor: pointer; font-weight: 500;
+    font-family: "Inter", sans-serif;
+    transition: background .12s;
   }
-  button:hover { filter: brightness(1.1); }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
-  button.secundario { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
-  button.peligro { background: var(--bad); }
-  button.ok { background: var(--ok); }
-  .estado-txt { font-size: 0.82rem; color: var(--text-dim); }
+  button:hover { background: var(--accent-dim); }
+  button:active { background: var(--accent-dim-2); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.secundario { color: var(--text); border-color: var(--border); }
+  button.secundario:hover { background: rgba(233,233,237,0.07); }
+  button.peligro { color: var(--bad); border-color: var(--bad); }
+  button.peligro:hover { background: var(--bad-dim); }
+  button.ok { color: var(--ok); border-color: var(--ok); }
+  button.ok:hover { background: var(--ok-dim); }
+  button.chico { padding: 6px 10px; font-size: 0.74rem; }
+
+  .estado-txt { font-size: 0.8rem; color: var(--text-dim); }
+
+  input[type=text] {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius); padding: 8px 11px; font-size: 0.84rem; min-width: 160px;
+    font-family: "Inter", sans-serif;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+
   pre.logs {
-    background: #0a0e17;
+    background: var(--panel-3);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px;
-    max-height: 220px;
+    border-radius: var(--radius);
+    padding: 12px;
+    height: 360px;
     overflow-y: auto;
     font-family: var(--mono);
-    font-size: 0.72rem;
-    line-height: 1.4;
-    color: #b9d3ff;
+    font-size: 0.71rem;
+    line-height: 1.55;
+    color: #b7c2e6;
     white-space: pre-wrap;
     word-break: break-all;
+    margin: 0;
   }
-  .grid-tramos { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  pre.logs .l-err, .terminal-body .l-err { color: var(--bad); }
+  pre.logs .l-ok, .terminal-body .l-ok { color: var(--ok); }
+  pre.logs .l-cmd, .terminal-body .l-cmd { color: #c9b56b; }
+
+  .grid-tramos { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
   .tramo {
     background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
+    border-left: 3px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
   }
-  .tramo .id { font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; }
-  .nivel { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; margin-bottom: 8px; }
-  .nivel.normal { background: rgba(53,192,120,0.18); color: var(--ok); }
-  .nivel.alerta_activa { background: rgba(239,92,92,0.18); color: var(--bad); }
-  .nivel.desconocido { background: rgba(154,164,189,0.18); color: var(--text-dim); }
-  .tramo .detalle { font-size: 0.72rem; color: var(--text-dim); }
-  .tramo .hora { font-weight: 400; font-size: 0.72rem; color: var(--text-dim); margin-left: 6px; font-family: var(--mono); }
-  .metricas { margin: 8px 0 6px; display: flex; flex-direction: column; gap: 3px; }
-  .metrica { display: grid; grid-template-columns: 5.2rem 5.6rem 1fr auto; gap: 8px; align-items: baseline; font-size: 0.78rem; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
-  .metrica.fuera { background: rgba(239,92,92,0.14); }
+  .tramo.st-normal { border-left-color: var(--ok); }
+  .tramo.st-alerta_activa { border-left-color: var(--bad); }
+  .tramo.st-desconocido { border-left-color: var(--text-dimmer); }
+  .tramo .top-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .tramo .id { font-weight: 600; font-size: 1rem; }
+  .tramo .hora { font-weight: 400; font-size: 0.68rem; color: var(--text-dimmer); font-family: var(--mono); }
+  .nivel { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; width: fit-content; }
+  .nivel.normal { background: var(--ok-dim); color: var(--ok); }
+  .nivel.alerta_activa { background: var(--bad-dim); color: var(--bad); animation: pulso 1.6s ease-in-out infinite; }
+  .nivel.desconocido { background: rgba(233,233,237,0.1); color: var(--text-dim); }
+  @keyframes pulso { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+  .pipeline { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin: 6px 0 10px; padding-top: 6px; }
+  .nodo { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 3.8rem; }
+  .nodo-punto { width: 9px; height: 9px; border-radius: 50%; background: var(--text-dimmer); }
+  .nodo-punto.normal { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-dim); }
+  .nodo-punto.alerta_activa { background: var(--bad); box-shadow: 0 0 0 3px var(--bad-dim); }
+  .nodo-label { font-size: 0.6rem; color: var(--text-dimmer); text-transform: uppercase; letter-spacing: 0.05em; }
+  .nodo-valor { font-family: var(--mono); font-size: 0.78rem; }
+  .nodo-valor small { font-size: 0.6rem; color: var(--text-dimmer); }
+  .tuberia { position: relative; height: 3px; border-radius: 2px; background: var(--border); margin: 0 2px; }
+  .tuberia.normal { background: var(--ok); opacity: 0.6; }
+  .tuberia.alerta_activa { background: var(--bad); opacity: 0.8; }
+  .tuberia-presion {
+    position: absolute; top: -17px; left: 50%; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 0.62rem; color: var(--text-dimmer); white-space: nowrap;
+  }
+  .tuberia-flag {
+    position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%);
+    font-size: 0.6rem; color: var(--bad); font-weight: 700; white-space: nowrap;
+  }
+
+  .metricas { display: flex; flex-direction: column; gap: 3px; }
+  .metrica { display: grid; grid-template-columns: 4.6rem 5.4rem 1fr auto; gap: 8px; align-items: baseline; font-size: 0.76rem; padding: 3px 6px; border-radius: 5px; white-space: nowrap; }
+  .metrica.fuera { background: var(--bad-dim); }
   .metrica.fuera .m-valor, .metrica.fuera .m-desv { color: var(--bad); font-weight: 700; }
   .m-nombre { color: var(--text-dim); }
-  .m-valor { font-family: var(--mono); font-size: 0.9rem; }
-  .m-valor small { font-size: 0.65rem; color: var(--text-dim); }
-  .m-nominal, .m-desv { font-size: 0.68rem; color: var(--text-dim); font-family: var(--mono); }
-  .tramo .btns { margin-top: 10px; display: flex; gap: 6px; }
-  .tramo .btns button { flex: 1; padding: 6px 8px; font-size: 0.75rem; }
-  .links a { color: var(--accent); text-decoration: none; font-size: 0.85rem; margin-right: 16px; }
-  .links a:hover { text-decoration: underline; }
+  .m-valor { font-family: var(--mono); font-size: 0.88rem; }
+  .m-valor small { font-size: 0.63rem; color: var(--text-dimmer); }
+  .m-nominal, .m-desv { font-size: 0.66rem; color: var(--text-dimmer); font-family: var(--mono); }
+
+  .tramo .detalle { font-size: 0.7rem; color: var(--text-dimmer); border-top: 1px solid var(--border-soft); padding-top: 8px; }
+  .tramo .btns { display: flex; gap: 6px; }
+  .tramo .btns button { flex: 1; }
+
+  .chips-forzados { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .chip-tramo {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bad-dim); color: var(--bad); border: 1px solid rgba(226,114,108,0.35);
+    border-radius: 999px; padding: 4px 10px 4px 8px; font-size: 0.72rem; font-weight: 700; font-family: var(--mono);
+  }
+  .chip-tramo.vacio { background: var(--panel-2); color: var(--text-dimmer); border-color: var(--border); font-family: inherit; font-weight: 500; }
+  .modo-line { font-size: 0.8rem; color: var(--text-dim); margin-top: 10px; }
+  .modo-line b { color: var(--text); }
+
   .resultado-esquema {
-    background: #0a0e17;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 12px;
-    font-family: var(--mono);
-    font-size: 0.75rem;
-    white-space: pre-wrap;
-    word-break: break-all;
-    margin-top: 10px;
-    display: none;
+    background: var(--panel-3); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px; font-family: var(--mono); font-size: 0.74rem;
+    white-space: pre-wrap; word-break: break-all; margin-top: 12px; display: none;
   }
   .resultado-esquema.mostrar { display: block; }
-  .mensaje-esquema { font-weight: 700; margin-bottom: 6px; }
+  .mensaje-esquema { font-weight: 700; margin-bottom: 8px; font-family: "Inter", sans-serif; font-size: 0.82rem; }
   .mensaje-esquema.rechazado { color: var(--ok); }
   .mensaje-esquema.aceptado { color: var(--bad); }
-  input[type=text] {
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 7px 10px;
-    font-size: 0.85rem;
-  }
-  .punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-  .punto.on { background: var(--ok); }
-  .punto.off { background: var(--text-dim); }
+
+  .links a { text-decoration: none; font-size: 0.82rem; display: flex; align-items: center; gap: 6px; padding: 8px 0; color: var(--text); }
+  .links a:hover { color: var(--accent); }
+  .links a:not(:last-child) { border-bottom: 1px solid var(--border-soft); }
+  .links a::after { content: "↗"; margin-left: auto; opacity: 0.6; }
+
+  .grid-terminales { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .terminal { background: var(--panel-3); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
+  .terminal-head { display: flex; align-items: center; gap: 7px; padding: 8px 10px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
+  .terminal-nombre { font-family: var(--mono); font-size: 0.74rem; font-weight: 700; }
+  .terminal-rol { font-size: 0.64rem; color: var(--text-dimmer); margin-left: auto; text-align: right; }
+  .terminal-body { margin: 0; padding: 10px; font-family: var(--mono); font-size: 0.66rem; line-height: 1.5; color: #b7c2e6; height: 190px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Panel de Operación — AndesTransporte Telemetría</h1>
-  <div class="subt">Taller 1 · ARTI4212</div>
 
-  <div class="card">
-    <h2>1. Stack de Docker <span class="badge" id="badge-stack">—</span></h2>
-    <div class="row">
-      <button id="btn-up">Levantar stack</button>
-      <button id="btn-down" class="peligro">Bajar stack</button>
-      <button id="btn-camel" class="secundario">+ Flujo Camel</button>
-      <button id="btn-reiniciar-deteccion" class="secundario" title="docker compose restart detector api">Reiniciar detección</button>
-      <button id="btn-refrescar-estado" class="secundario">Actualizar estado</button>
-      <span class="estado-txt" id="stack-resumen"></span>
-    </div>
-    <pre class="logs" id="logs">(sin actividad todavía — pulsa "Levantar stack")</pre>
+<header class="topbar">
+  <div>
+    <h1>Panel de Operación — AndesTransporte Telemetría</h1>
+    <div class="subt">Taller 1 · ARTI4212</div>
   </div>
+  <div class="estado-globales">
+    <span class="pill-estado"><span class="punto off" id="punto-stack"></span><span id="badge-stack">—</span></span>
+    <span class="pill-estado"><span class="punto off" id="punto-api"></span><span id="badge-api">—</span></span>
+  </div>
+</header>
 
-  <div class="card">
-    <h2>2. Estado en vivo por tramo <span class="badge" id="badge-api">—</span> <span class="badge">1 muestra/s · refresco 1 s</span></h2>
-    <div class="grid-tramos" id="grid-tramos">
-      <div class="estado-txt">Esperando datos de la API (localhost:8090)...</div>
-    </div>
-  </div>
+<div class="layout">
+  <main>
 
-  <div class="card">
-    <h2>3. Control manual de la anomalía</h2>
-    <p class="estado-txt">
-      "Quitar anomalía" hace dos cosas: el simulador vuelve a lecturas normales <em>y</em> se reconoce la alerta en la API
-      (<code>POST /tramos/{id}/alertas/reconocer</code>), así la tarjeta vuelve a <code>normal</code> al instante. Si la
-      anomalía reaparece, el detector emite una alerta nueva (nuevo episodio) y la tarjeta vuelve a rojo en ~3–4 s.
-    </p>
-    <p class="estado-txt">
-      Con estos botones fuerzas (o quitas) la anomalía en un tramo específico al instante — más convincente en vivo:
-      un tramo entra en alerta y el otro sigue normal. Al levantar el stack, el panel deja el control en
-      <em>manual sin tramos</em> (todo normal) para partir siempre de un estado conocido.
-    </p>
-    <p class="estado-txt">
-      El detector compara <strong>cada muestra</strong> (1 por segundo) contra la <strong>ficha nominal fija</strong> del tramo
-      (<code>detector/tramos-nominal.json</code>: 45 bar, 120 m³/h) y confirma la anomalía tras <strong>3 muestras
-      consecutivas</strong> fuera de umbral (−10 % de presión y ≥ 8 m³/h de descuadre a la vez). Tras inyectar, la tarjeta
-      pasa a rojo en <strong>~3–4 s</strong>. No hay línea base aprendida: da igual el estado en que arranque el tramo.
-    </p>
-    <div class="row">
-      <input type="text" id="input-tramo-manual" placeholder="ej. tramo-14" />
-      <button id="btn-activar-manual">Inyectar anomalía</button>
-      <button id="btn-desactivar-manual" class="secundario">Quitar anomalía</button>
-      <button id="btn-reset-manual" class="secundario">Volver a modo automático</button>
+    <div class="card">
+      <h2><span class="num">1</span>Stack de Docker</h2>
+      <div class="row">
+        <button id="btn-up">Levantar stack</button>
+        <button id="btn-down" class="peligro">Bajar stack</button>
+        <button id="btn-camel" class="secundario">+ Flujo Camel</button>
+        <button id="btn-reiniciar-deteccion" class="secundario" title="docker compose restart detector api">Reiniciar detección</button>
+        <button id="btn-refrescar-estado" class="secundario">Actualizar estado</button>
+      </div>
+      <div class="row"><span class="estado-txt" id="stack-resumen">—</span></div>
     </div>
-    <div class="estado-txt" id="control-estado">—</div>
-  </div>
 
-  <div class="card">
-    <h2>4. Gobierno del Schema Registry</h2>
-    <p class="estado-txt">
-      Envía al registry el esquema de telemetría con <code>data.valor</code> cambiado de <code>number</code> a
-      <code>string</code> (el cambio de ejemplo que el propio documento de gobierno declara como prohibido bajo
-      <code>BACKWARD_TRANSITIVE</code>) y muestra la respuesta cruda. Si todo está bien configurado, el registry
-      debe responder <code>is_compatible: false</code> junto con la razón (<code>TYPE_CHANGED</code> en
-      <code>data.valor</code>).
-    </p>
-    <div class="row">
-      <button id="btn-registrar-esquemas" class="secundario">1. Registrar esquemas</button>
-      <button id="btn-probar-esquema" class="ok">2. Probar cambio incompatible</button>
-      <button id="btn-ver-config-esquema" class="secundario">Ver regla configurada</button>
+    <div class="card">
+      <h2><span class="num">2</span>Estado en vivo por tramo<span class="badge">refresco 1 s</span></h2>
+      <p class="desc">Cada tramo se ve como su tubería: caudal de entrada (Inicio), presión en el segmento y caudal de salida (Fin). Un descuadre entre Inicio y Fin es la señal de una extracción no autorizada.</p>
+      <div class="grid-tramos" id="grid-tramos">
+        <div class="estado-txt">Esperando datos de la API (localhost:8090)...</div>
+      </div>
     </div>
-    <p class="estado-txt">
-      "Registrar esquemas" ejecuta los cuatro <code>curl</code> de <code>docs/06-*</code> §4 (registra ambos subjects con
-      <code>schemaType: JSON</code> y fija <code>BACKWARD_TRANSITIVE</code>). Es idempotente; hace falta tras cada
-      <code>docker compose down -v</code>, porque el registry arranca vacío.
-    </p>
-    <div class="resultado-esquema" id="resultado-esquema"></div>
-  </div>
 
-  <div class="card">
-    <h2>Enlaces rápidos</h2>
-    <div class="links">
-      <a href="http://localhost:8080" target="_blank">Redpanda Console</a>
-      <a href="http://localhost:8090/docs" target="_blank">API — Swagger/OpenAPI</a>
-      <a href="http://localhost:18081/subjects" target="_blank">Schema Registry — subjects</a>
+    <div class="card">
+      <h2><span class="num">3</span>Control manual de la anomalía</h2>
+      <div class="row">
+        <input type="text" id="input-tramo-manual" placeholder="ej. tramo-14" />
+        <button id="btn-activar-manual">Inyectar anomalía</button>
+        <button id="btn-desactivar-manual" class="secundario">Quitar anomalía</button>
+        <button id="btn-reset-manual" class="secundario">Volver a modo automático</button>
+      </div>
+      <div class="modo-line" id="control-modo">Modo: —</div>
+      <div class="chips-forzados" id="control-chips"></div>
+      <details class="info">
+        <summary>Cómo funciona el control manual</summary>
+        <div class="info-body">
+          <p>"Quitar anomalía" hace dos cosas: el simulador vuelve a lecturas normales <em>y</em> se reconoce la alerta en la API
+          (<code>POST /tramos/{id}/alertas/reconocer</code>), así la tarjeta vuelve a <code>normal</code> al instante. Si la
+          anomalía reaparece, el detector emite una alerta nueva (nuevo episodio) y la tarjeta vuelve a rojo en ~3–4 s.</p>
+          <p>El detector compara cada muestra (1 por segundo) contra la ficha nominal fija del tramo
+          (<code>detector/tramos-nominal.json</code>: 45 bar, 120 m³/h) y confirma la anomalía tras 3 muestras consecutivas
+          fuera de umbral (−10% de presión y ≥8 m³/h de descuadre a la vez). No hay línea base aprendida: da igual el estado
+          en que arranque el tramo.</p>
+        </div>
+      </details>
     </div>
-  </div>
+
+    <div class="card">
+      <h2><span class="num">4</span>Gobierno del Schema Registry</h2>
+      <p class="desc">Envía al registry el esquema de telemetría con <code>data.valor</code> cambiado de <code>number</code> a <code>string</code>, y muestra la respuesta cruda del registry.</p>
+      <div class="row">
+        <button id="btn-registrar-esquemas" class="secundario">1. Registrar esquemas</button>
+        <button id="btn-probar-esquema" class="ok">2. Probar cambio incompatible</button>
+        <button id="btn-ver-config-esquema" class="secundario">Ver regla configurada</button>
+      </div>
+      <details class="info">
+        <summary>Qué hace cada botón</summary>
+        <div class="info-body">
+          <p>"Registrar esquemas" registra ambos subjects con <code>schemaType: JSON</code> y fija <code>BACKWARD_TRANSITIVE</code>.
+          Es idempotente; hace falta tras cada <code>docker compose down -v</code>, porque el registry arranca vacío.</p>
+          <p>Si todo está bien configurado, "Probar cambio incompatible" debe responder <code>is_compatible: false</code>
+          junto con la razón (<code>TYPE_CHANGED</code> en <code>data.valor</code>).</p>
+        </div>
+      </details>
+      <div class="resultado-esquema" id="resultado-esquema"></div>
+    </div>
+
+  </main>
+
+  <aside class="sidebar">
+    <div class="card">
+      <h2>Consola del stack<span class="badge" id="badge-consola">sin actividad</span></h2>
+      <pre class="logs" id="logs">(sin actividad todavía — pulsa "Levantar stack")</pre>
+    </div>
+    <div class="card">
+      <h2>Enlaces rápidos</h2>
+      <div class="links">
+        <a href="http://localhost:8080" target="_blank">Redpanda Console</a>
+        <a href="http://localhost:8090/docs" target="_blank">API — Swagger/OpenAPI</a>
+        <a href="http://localhost:18081/subjects" target="_blank">Schema Registry — subjects</a>
+      </div>
+    </div>
+  </aside>
 </div>
+
+<section class="consolas-full">
+  <div class="card">
+    <h2><span class="num">5</span>Consolas por contenedor<span class="badge">docker logs · refresco 4 s</span></h2>
+    <p class="desc">Una terminal por cada contenedor del stack — para ver qué está haciendo cada pieza (broker MQTT, broker Kafka, simulador, puente, detector, API...) sin abrir Docker Desktop.</p>
+    <div class="grid-terminales" id="grid-consolas"></div>
+  </div>
+</section>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -227,7 +370,7 @@ const $ = (id) => document.getElementById(id);
 async function jsonFetch(url, opciones) {
   const r = await fetch(url, opciones);
   let cuerpo = null;
-  try { cuerpo = await r.json(); } catch (e) {  }
+  try { cuerpo = await r.json(); } catch (e) {}
   if (!r.ok) {
     const detalle = cuerpo && cuerpo.detail ? cuerpo.detail : r.statusText;
     throw new Error(detalle);
@@ -235,18 +378,30 @@ async function jsonFetch(url, opciones) {
   return cuerpo;
 }
 
+function coloreaLinea(linea) {
+  const esc = linea.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  if (/error/i.test(linea)) return `<span class="l-err">${esc}</span>`;
+  if (/^---/.test(linea) || /healthy|ready|started/i.test(linea)) return `<span class="l-ok">${esc}</span>`;
+  if (linea.startsWith('$')) return `<span class="l-cmd">${esc}</span>`;
+  return esc;
+}
+
 async function refrescarLogs() {
   try {
     const datos = await jsonFetch('/api/stack/logs');
-    $('logs').textContent = (datos.logs && datos.logs.length) ? datos.logs.join('\n') : '(sin salida todavía)';
+    $('logs').innerHTML = (datos.logs && datos.logs.length) ? datos.logs.map(coloreaLinea).join('\n') : '(sin salida todavía)';
     $('logs').scrollTop = $('logs').scrollHeight;
-    $('badge-stack').textContent = datos.corriendo ? 'EN CURSO: ' + datos.comando : (datos.comando || 'sin actividad');
-    $('btn-up').disabled = datos.corriendo;
-    $('btn-down').disabled = datos.corriendo;
-    $('btn-camel').disabled = datos.corriendo;
-    $('btn-reiniciar-deteccion').disabled = datos.corriendo;
+    const enCurso = datos.corriendo;
+    $('badge-stack').textContent = enCurso ? 'EN CURSO' : (datos.comando || 'sin actividad');
+    $('badge-consola').textContent = enCurso ? datos.comando : 'listo';
+    $('punto-stack').className = 'punto ' + (enCurso ? 'on' : 'off');
+    $('btn-up').disabled = enCurso;
+    $('btn-down').disabled = enCurso;
+    $('btn-camel').disabled = enCurso;
+    $('btn-reiniciar-deteccion').disabled = enCurso;
   } catch (e) {
     $('badge-stack').textContent = 'panel sin conexión';
+    $('punto-stack').className = 'punto bad';
   }
 }
 
@@ -274,7 +429,7 @@ $('btn-camel').onclick = async () => {
   refrescarLogs();
 };
 $('btn-reiniciar-deteccion').onclick = async () => {
-  if (!confirm('Reinicia los contenedores detector y api (~10 s). Se pierden la línea base y las alertas acumuladas; todos los tramos vuelven a "normal". ¿Continuar?')) return;
+  if (!confirm('Reinicia los contenedores detector y api (~10 s). Todos los tramos vuelven a "normal" y las alertas históricas quedan reconocidas. ¿Continuar?')) return;
   try { await jsonFetch('/api/stack/reiniciar-deteccion', { method: 'POST' }); } catch (e) { alert(e.message); }
   refrescarLogs();
   refrescarControl();
@@ -307,15 +462,35 @@ function metricasTramo(t) {
   const m = t.metricas || {};
   const nom = m.nominal || {};
   const caida = m.caidaPresionPct;
-  const desc = m.descuadreM3h;
   const umbralP = (t.ultimaAlerta && t.ultimaAlerta.data.umbralPresionPorcentaje) || 10;
-  const umbralB = (t.ultimaAlerta && t.ultimaAlerta.data.umbralBalanceM3h) || 8;
   return filaMetrica('Presión', m.presionBar, 'bar', nom.presionNominalBar,
                      caida == null ? '' : (caida >= 0 ? '−' : '+') + fmt(Math.abs(caida)) + ' %', caida != null && caida >= umbralP)
-       + filaMetrica('Caudal ↑', m.caudalArribaM3h, 'm³/h', nom.caudalNominalM3h, '', false)
-       + filaMetrica('Caudal ↓', m.caudalAbajoM3h, 'm³/h', nom.caudalNominalM3h,
-                     desc == null ? '' : 'descuadre ' + fmt(desc) + ' m³/h', desc != null && desc >= umbralB)
        + filaMetrica('Temperatura', m.temperaturaC, '°C', null, '', false);
+}
+
+function pipelineTramo(t) {
+  const m = t.metricas || {};
+  const nivel = t.nivel || 'desconocido';
+  const desc = m.descuadreM3h;
+  const umbralB = (t.ultimaAlerta && t.ultimaAlerta.data.umbralBalanceM3h) || 8;
+  const fueraBalance = desc != null && desc >= umbralB;
+  return `
+    <div class="pipeline">
+      <div class="nodo">
+        <span class="nodo-punto ${nivel}"></span>
+        <span class="nodo-label">Inicio</span>
+        <span class="nodo-valor">${fmt(m.caudalArribaM3h)} <small>m³/h</small></span>
+      </div>
+      <div class="tuberia ${nivel}">
+        <span class="tuberia-presion">${fmt(m.presionBar)} bar</span>
+        ${fueraBalance ? `<span class="tuberia-flag">⚠ ${fmt(desc)} m³/h</span>` : ''}
+      </div>
+      <div class="nodo">
+        <span class="nodo-punto ${nivel}"></span>
+        <span class="nodo-label">Fin</span>
+        <span class="nodo-valor">${fmt(m.caudalAbajoM3h)} <small>m³/h</small></span>
+      </div>
+    </div>`;
 }
 
 function tarjetaTramo(t) {
@@ -323,14 +498,18 @@ function tarjetaTramo(t) {
   const hora = t.ultimaLectura ? (t.ultimaLectura.time || '').slice(11, 19) : '—';
   const ultimaAlerta = resumenAlerta(t.ultimaAlerta);
   return `
-    <div class="tramo">
-      <div class="id">${t.tramoId} <span class="hora">${hora}</span></div>
-      <span class="nivel ${nivel}">${nivel}</span>
+    <div class="tramo st-${nivel}">
+      <div class="top-row">
+        <span class="id">${t.tramoId}</span>
+        <span class="hora">${hora}</span>
+      </div>
+      <span class="nivel ${nivel}">${nivel.replace('_',' ')}</span>
+      ${pipelineTramo(t)}
       <div class="metricas">${metricasTramo(t)}</div>
       <div class="detalle">última alerta: ${ultimaAlerta}</div>
       <div class="btns">
-        <button onclick="activarAnomalia('${t.tramoId}')">Inyectar anomalía</button>
-        <button class="secundario" onclick="desactivarAnomalia('${t.tramoId}')">Quitar anomalía</button>
+        <button class="chico" onclick="activarAnomalia('${t.tramoId}')">Inyectar</button>
+        <button class="chico secundario" onclick="desactivarAnomalia('${t.tramoId}')">Quitar</button>
       </div>
     </div>`;
 }
@@ -339,6 +518,7 @@ async function refrescarStatus() {
   try {
     const datos = await jsonFetch('/api/status');
     $('badge-api').textContent = datos.api_disponible ? 'API arriba' : 'API no disponible';
+    $('punto-api').className = 'punto ' + (datos.api_disponible ? 'on' : 'bad');
     if (!datos.api_disponible) {
       $('grid-tramos').innerHTML = `<div class="estado-txt">${datos.mensaje || 'API no disponible todavía.'}</div>`;
       return;
@@ -350,16 +530,21 @@ async function refrescarStatus() {
     $('grid-tramos').innerHTML = datos.tramos.map(tarjetaTramo).join('');
   } catch (e) {
     $('badge-api').textContent = 'panel sin conexión';
+    $('punto-api').className = 'punto bad';
   }
 }
 
 async function refrescarControl() {
   try {
     const datos = await jsonFetch('/api/anomalia/estado');
-    const lista = (datos.tramosConAnomalia || []).join(', ') || 'ninguno';
-    $('control-estado').textContent = `Modo: ${datos.modo} · Tramos forzados con anomalía: ${lista}`;
+    const forzados = datos.tramosConAnomalia || [];
+    $('control-modo').innerHTML = `Modo: <b>${datos.modo}</b>`;
+    $('control-chips').innerHTML = forzados.length
+      ? forzados.map(t => `<span class="chip-tramo">${t}</span>`).join('')
+      : '<span class="chip-tramo vacio">ningún tramo forzado</span>';
   } catch (e) {
-    $('control-estado').textContent = '—';
+    $('control-modo').textContent = 'Modo: —';
+    $('control-chips').innerHTML = '';
   }
 }
 
@@ -416,7 +601,7 @@ $('btn-registrar-esquemas').onclick = async () => {
     const datos = await jsonFetch('/api/esquema/registrar', { method: 'POST' });
     const clase = datos.ok ? 'rechazado' : 'aceptado';
     el.innerHTML = `<div class="mensaje-esquema ${clase}">${datos.mensaje}</div>` +
-      datos.pasos.map(p => `HTTP ${p.http_status}  ${p.paso}: ${JSON.stringify(p.respuesta)}`).join(String.fromCharCode(10));
+      datos.pasos.map(p => `HTTP ${p.http_status}  ${p.paso}: ${JSON.stringify(p.respuesta)}`).join('\n');
   } catch (e) {
     el.textContent = 'Error: ' + e.message;
   }
@@ -433,6 +618,50 @@ $('btn-ver-config-esquema').onclick = async () => {
   }
 };
 
+let contenedores = [];
+
+function idTerm(nombre) { return 'term-' + nombre.replace(/[^a-z0-9]/gi, '-'); }
+
+async function inicializarConsolas() {
+  try {
+    contenedores = (await jsonFetch('/api/contenedores')).contenedores;
+  } catch (e) {
+    $('grid-consolas').innerHTML = '<div class="estado-txt">Panel sin conexión.</div>';
+    return;
+  }
+  $('grid-consolas').innerHTML = contenedores.map(c => `
+    <div class="terminal">
+      <div class="terminal-head">
+        <span class="punto off" id="${idTerm(c.nombre)}-punto"></span>
+        <span class="terminal-nombre">${c.nombre}</span>
+        <span class="terminal-rol">${c.rol}</span>
+      </div>
+      <pre class="terminal-body" id="${idTerm(c.nombre)}">cargando…</pre>
+    </div>`).join('');
+  refrescarTodasLasConsolas();
+}
+
+async function refrescarConsola(nombre) {
+  const el = $(idTerm(nombre));
+  if (!el) return;
+  try {
+    const datos = await jsonFetch('/api/contenedores/logs?nombre=' + encodeURIComponent(nombre) + '&tail=80');
+    if (datos.codigo_salida !== 0) throw new Error('sin contenedor');
+    const abajo = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
+    el.innerHTML = (datos.lineas && datos.lineas.length) ? datos.lineas.map(coloreaLinea).join('\n') : '(sin salida)';
+    if (abajo) el.scrollTop = el.scrollHeight;
+    $(idTerm(nombre) + '-punto').className = 'punto on';
+  } catch (e) {
+    el.textContent = 'sin datos — ¿el contenedor está arriba?';
+    $(idTerm(nombre) + '-punto').className = 'punto off';
+  }
+}
+
+function refrescarTodasLasConsolas() {
+  contenedores.forEach((c, i) => setTimeout(() => refrescarConsola(c.nombre), i * 150));
+}
+
+inicializarConsolas();
 refrescarLogs();
 refrescarEstadoContenedores();
 refrescarStatus();
@@ -442,6 +671,7 @@ setInterval(refrescarLogs, 2000);
 setInterval(refrescarEstadoContenedores, 8000);
 setInterval(refrescarStatus, 1000);
 setInterval(refrescarControl, 5000);
+setInterval(refrescarTodasLasConsolas, 4000);
 </script>
 </body>
 </html>

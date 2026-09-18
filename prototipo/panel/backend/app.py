@@ -203,6 +203,45 @@ def stack_estado():
     return {"contenedores": contenedores, "salida_cruda": salida, "stderr": resultado.stderr}
 
 
+CONTENEDORES = [
+    {"nombre": "redpanda", "rol": "broker Kafka"},
+    {"nombre": "redpanda-console", "rol": "UI de Kafka"},
+    {"nombre": "mosquitto", "rol": "broker MQTT"},
+    {"nombre": "simulador-telemetria", "rol": "genera lecturas OT"},
+    {"nombre": "puente-ot-it", "rol": "puente MQTT -> Kafka"},
+    {"nombre": "detector-anomalias", "rol": "detecta anomalias"},
+    {"nombre": "api-estado-tramo", "rol": "API de estado"},
+    {"nombre": "camel-integracion-balance", "rol": "flujo Camel (perfil camel)"},
+]
+_NOMBRES_CONTENEDORES = {c["nombre"] for c in CONTENEDORES}
+
+
+@app.get("/api/contenedores", summary="Lista de contenedores conocidos del stack")
+def contenedores_lista():
+    return {"contenedores": CONTENEDORES}
+
+
+@app.get("/api/contenedores/logs", summary="docker logs --tail N <contenedor>, para la vista de consolas")
+def contenedor_logs(nombre: str, tail: int = 80):
+    if nombre not in _NOMBRES_CONTENEDORES:
+        raise HTTPException(status_code=400, detail=f"Contenedor desconocido: {nombre}")
+    tail = max(1, min(tail, 500))
+    try:
+        resultado = subprocess.run(
+            ["docker", "logs", "--tail", str(tail), nombre],
+            capture_output=True,
+            text=True,
+            timeout=8,
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="No se encontro el comando 'docker'.")
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="docker logs no respondio a tiempo.")
+    salida = (resultado.stdout or "") + (resultado.stderr or "")
+    lineas = salida.splitlines()
+    return {"nombre": nombre, "lineas": lineas[-tail:], "codigo_salida": resultado.returncode}
+
+
 @app.get("/api/status", summary="Estado consolidado de todos los tramos conocidos")
 def status():
     try:
