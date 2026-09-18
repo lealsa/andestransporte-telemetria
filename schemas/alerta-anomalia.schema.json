@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://andestransporte.example.com/schemas/alerta-anomalia.schema.json",
+  "title": "AlertaAnomaliaValvula",
+  "description": "Evento CloudEvents que transporta una alerta de posible válvula ilícita o fuga, emitida por el Detector de Anomalías cuando caída de presión (respecto de la presión nominal del tramo) y descuadre de balance se sostienen durante N muestras consecutivas. Se emite una vez por episodio.",
+  "type": "object",
+  "required": ["specversion", "id", "source", "type", "time", "subject", "datacontenttype", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "specversion": { "const": "1.0" },
+    "id": {
+      "type": "string",
+      "description": "Identificador único de la alerta (UUID v4)."
+    },
+    "source": {
+      "type": "string",
+      "const": "urn:andestransporte:detector-anomalias"
+    },
+    "type": {
+      "const": "com.andestransporte.alerta.valvula-ilicita.v1"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "subject": {
+      "type": "string",
+      "description": "Identificador del tramo afectado (misma clave de partición usada en telemetría, ver ADR-006)."
+    },
+    "datacontenttype": {
+      "const": "application/json"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "tramoId",
+        "ventanaInicio",
+        "ventanaFin",
+        "caidaPresionPorcentaje",
+        "diferenciaBalanceM3h",
+        "umbralPresionPorcentaje",
+        "umbralBalanceM3h",
+        "severidad",
+        "posibleCausa",
+        "eventosOrigenIds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tramoId": { "type": "string" },
+        "ventanaInicio": { "type": "string", "format": "date-time", "description": "Instante de la primera muestra anómala del episodio." },
+        "ventanaFin": { "type": "string", "format": "date-time", "description": "Instante de la muestra que completó la persistencia requerida y confirmó la alerta." },
+        "caidaPresionPorcentaje": {
+          "type": "number",
+          "description": "Caída de presión en la muestra que confirmó la alerta, como porcentaje respecto de la presión nominal del tramo (ficha técnica, referencia fija)."
+        },
+        "diferenciaBalanceM3h": {
+          "type": "number",
+          "description": "Diferencia entre caudal aguas arriba y aguas abajo del tramo en la muestra que confirmó la alerta (m3/h)."
+        },
+        "umbralPresionPorcentaje": { "type": "number" },
+        "umbralBalanceM3h": { "type": "number" },
+        "severidad": {
+          "type": "string",
+          "enum": ["baja", "media", "alta"]
+        },
+        "posibleCausa": {
+          "type": "string",
+          "enum": ["valvula_ilicita_sospechada", "fuga_sospechada", "indeterminado"]
+        },
+        "eventosOrigenIds": {
+          "type": "array",
+          "description": "IDs de los eventos telemetria-lectura (muestras de presión) del episodio que originó la alerta, para trazabilidad completa.",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      }
+    }
+  }
+}

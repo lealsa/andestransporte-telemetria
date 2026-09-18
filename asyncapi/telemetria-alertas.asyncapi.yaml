@@ -1,0 +1,197 @@
+asyncapi: 3.1.0
+info:
+  title: Plataforma de Integración de Telemetría — AndesTransporte
+  version: 1.0.0
+  description: >
+    Contrato de eventos entre el dominio OT (telemetría de pozos y ductos) y el
+    dominio IT (detección de anomalías, integración de negocio) de AndesTransporte.
+    Define los canales de telemetría normalizada y de alertas de posible válvula
+    ilícita o fuga. Los payloads siguen CloudEvents 1.0 (ver ADR-002) y están
+    gobernados por un Schema Registry con regla de compatibilidad BACKWARD_TRANSITIVE
+    (ver docs/05-gobierno-schema-registry.md).
+  contact:
+    name: Equipo de Arquitectura de Integración
+    email: leal.sa982@gmail.com
+  license:
+    name: Uso académico — Curso Arquitectura de Integración
+
+defaultContentType: application/cloudevents+json
+
+servers:
+  redpanda-broker:
+    host: redpanda:9092
+    protocol: kafka
+    description: >
+      Bus de eventos IT (Nivel 4 Purdue). Único servidor al que el Puente OT->IT
+      publica tras cruzar la DMZ industrial (Nivel 3.5). Ver docs/02-purdue-dmz-iec62443.md.
+  mosquitto-broker:
+    host: mosquitto:1883
+    protocol: mqtt
+    description: >
+      Broker OT (Nivel 3 Purdue) que concentra la telemetría cruda de campo, antes
+      de la normalización a CloudEvents. Documentado por completitud del flujo
+      extremo a extremo; no forma parte del contrato gobernado por el Schema Registry.
+
+channels:
+  telemetryReadings:
+    address: ot.telemetry.v1
+    title: Telemetría normalizada de pozos y ductos
+    description: >
+      Lecturas de presión, caudal y temperatura ya normalizadas a CloudEvents por
+      el Puente OT->IT. Clave de partición = tramoId/pozoId (ver ADR-006).
+    servers:
+      - $ref: '#/servers/redpanda-broker'
+    messages:
+      telemetriaLecturaMessage:
+        name: TelemetriaLectura
+        title: Lectura de sensor normalizada
+        contentType: application/cloudevents+json
+        payload:
+          $ref: '../schemas/telemetria-lectura.schema.json'
+        bindings:
+          kafka:
+            key:
+              type: string
+              description: tramoId o pozoId — ver ADR-006 (clave de partición)
+    bindings:
+      kafka:
+        partitions: 6
+        replicas: 1
+        topicConfiguration:
+          cleanup.policy: [delete]
+          retention.ms: 604800000
+
+  valveAnomalyAlerts:
+    address: it.alerts.valve-anomaly.v1
+    title: Alertas de posible válvula ilícita o fuga
+    description: >
+      Alertas emitidas por el Detector de Anomalías cuando una caída sostenida de
+      presión coincide con un descuadre de balance por encima del umbral en la
+      misma ventana horaria (ver docs/06-guia-implementacion-prototipo.md).
+    servers:
+      - $ref: '#/servers/redpanda-broker'
+    messages:
+      alertaAnomaliaMessage:
+        name: AlertaAnomaliaValvula
+        title: Alerta de anomalía de válvula/fuga
+        contentType: application/cloudevents+json
+        payload:
+          $ref: '../schemas/alerta-anomalia.schema.json'
+        bindings:
+          kafka:
+            key:
+              type: string
+              description: tramoId — mismo criterio de partición que la telemetría (ADR-006)
+    bindings:
+      kafka:
+        partitions: 6
+        replicas: 1
+        topicConfiguration:
+          cleanup.policy: [delete]
+          retention.ms: 2592000000
+
+  rawSensorReadings:
+    address: 'ot/tramo/{tramoId}/sensor/{sensorId}'
+    title: Lectura cruda de sensor (OT, pre-DMZ)
+    description: >
+      Topic MQTT interno del dominio OT (Nivel 3), publicado por el generador de
+      telemetría sintética. No está gobernado por el Schema Registry ni por
+      CloudEvents; el Puente OT->IT es quien lo traduce al canal telemetryReadings
+      al cruzar la DMZ industrial. Se documenta por completitud del flujo.
+    servers:
+      - $ref: '#/servers/mosquitto-broker'
+    parameters:
+      tramoId:
+        description: Identificador del tramo o pozo de origen.
+      sensorId:
+        description: Identificador del sensor de campo.
+    messages:
+      lecturaCrudaMqttMessage:
+        name: LecturaCrudaMqtt
+        contentType: application/json
+        payload:
+          type: object
+          required: [tramoId, sensorId, tipoSensor, valor, unidad, timestamp]
+          properties:
+            tramoId: { type: string, description: Tramo o pozo al que pertenece el sensor. }
+            sensorId: { type: string }
+            tipoSensor: { type: string, enum: [presion, caudal, temperatura] }
+            rol:
+              type: string
+              enum: [aguas_arriba, aguas_abajo, no_aplica]
+              description: Rol del punto de medicion en el balance del tramo (solo caudal). Si falta, el Puente asume no_aplica.
+            valor: { type: number }
+            unidad: { type: string, enum: [bar, m3h, celsius] }
+            timestamp: { type: string, format: date-time }
+            calidad:
+              type: string
+              enum: [buena, incierta, mala]
+              description: Calidad de la senal reportada por el PLC/OPC-UA. Si falta, el Puente la marca 'incierta' (nunca la inventa como 'buena').
+
+operations:
+  publicarTelemetria:
+    action: send
+    channel:
+      $ref: '#/channels/telemetryReadings'
+    title: Publicar telemetría normalizada
+    summary: >
+      El Puente OT->IT publica una lectura normalizada inmediatamente después de
+      validarla contra el Schema Registry, al cruzar la DMZ industrial (conducto C4).
+    messages:
+      - $ref: '#/channels/telemetryReadings/messages/telemetriaLecturaMessage'
+    bindings:
+      kafka:
+        clientId:
+          type: string
+          enum: [puente-ot-it]
+
+  consumirTelemetriaParaDeteccion:
+    action: receive
+    channel:
+      $ref: '#/channels/telemetryReadings'
+    title: Consumir telemetría para detección
+    summary: El Detector de Anomalías consume lecturas para evaluar la regla combinada de presión y balance.
+    messages:
+      - $ref: '#/channels/telemetryReadings/messages/telemetriaLecturaMessage'
+    bindings:
+      kafka:
+        groupId:
+          type: string
+          enum: [detector-anomalias]
+
+  publicarAlertaAnomalia:
+    action: send
+    channel:
+      $ref: '#/channels/valveAnomalyAlerts'
+    title: Publicar alerta de anomalía
+    summary: El Detector de Anomalías publica una alerta cuando se supera el umbral combinado, vía Transactional Outbox (ADR-004).
+    messages:
+      - $ref: '#/channels/valveAnomalyAlerts/messages/alertaAnomaliaMessage'
+    bindings:
+      kafka:
+        clientId:
+          type: string
+          enum: [detector-anomalias]
+
+  consumirAlertaParaIntegracion:
+    action: receive
+    channel:
+      $ref: '#/channels/valveAnomalyAlerts'
+    title: Consumir alerta para integración de negocio
+    summary: El flujo Apache Camel consume la alerta y la enruta al Sistema de Balance Volumétrico aplicando los patrones EIP descritos en ADR-005.
+    messages:
+      - $ref: '#/channels/valveAnomalyAlerts/messages/alertaAnomaliaMessage'
+    bindings:
+      kafka:
+        groupId:
+          type: string
+          enum: [camel-integracion-balance]
+
+  publicarLecturaCrudaMqtt:
+    action: send
+    channel:
+      $ref: '#/channels/rawSensorReadings'
+    title: Publicar lectura cruda (OT)
+    summary: El generador de telemetría sintética publica la lectura cruda antes de cruzar la DMZ. Documentado por completitud, fuera del contrato gobernado.
+    messages:
+      - $ref: '#/channels/rawSensorReadings/messages/lecturaCrudaMqttMessage'

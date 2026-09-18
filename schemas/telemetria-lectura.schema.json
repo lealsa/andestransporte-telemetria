@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://andestransporte.example.com/schemas/telemetria-lectura.schema.json",
+  "title": "TelemetriaLectura",
+  "description": "Evento CloudEvents que transporta una lectura normalizada de un sensor de campo (presión, caudal o temperatura) de un pozo o tramo de ducto.",
+  "type": "object",
+  "required": ["specversion", "id", "source", "type", "time", "subject", "datacontenttype", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "specversion": { "const": "1.0" },
+    "id": {
+      "type": "string",
+      "description": "Identificador único del evento (UUID v4), usado para deduplicación idempotente aguas abajo."
+    },
+    "source": {
+      "type": "string",
+      "description": "URI del emisor. Para este dominio: 'urn:andestransporte:puente-ot-it'.",
+      "pattern": "^urn:andestransporte:"
+    },
+    "type": {
+      "const": "com.andestransporte.telemetria.lectura.v1"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Marca de tiempo ISO-8601 en que el Puente OT->IT generó el evento (no necesariamente igual a la marca de lectura del sensor, ver data.timestampLectura)."
+    },
+    "subject": {
+      "type": "string",
+      "description": "Identificador del activo físico (tramo o pozo). Es también la clave de partición del topic (ver ADR-006).",
+      "examples": ["tramo-14", "pozo-a-07"]
+    },
+    "datacontenttype": {
+      "const": "application/json"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "tramoId",
+        "sensorId",
+        "tipoSensor",
+        "valor",
+        "unidad",
+        "timestampLectura",
+        "calidadSenal"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tramoId": {
+          "type": "string",
+          "description": "Identificador del tramo de ducto o pozo al que pertenece el sensor."
+        },
+        "sensorId": {
+          "type": "string",
+          "description": "Identificador único del sensor/transmisor de campo."
+        },
+        "tipoSensor": {
+          "type": "string",
+          "enum": ["presion", "caudal", "temperatura"]
+        },
+        "rol": {
+          "type": "string",
+          "description": "Rol del punto de medición dentro del tramo, usado por el Detector para calcular el balance (aguas arriba/aguas abajo). Opcional: solo aplica a sensores de caudal.",
+          "enum": ["aguas_arriba", "aguas_abajo", "no_aplica"],
+          "default": "no_aplica"
+        },
+        "valor": {
+          "type": "number",
+          "description": "Valor de la lectura en la unidad indicada en 'unidad'."
+        },
+        "unidad": {
+          "type": "string",
+          "enum": ["bar", "m3h", "celsius"]
+        },
+        "timestampLectura": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Marca de tiempo original de la lectura en el sensor/PLC de campo."
+        },
+        "calidadSenal": {
+          "type": "string",
+          "description": "Calidad OPC-UA/SCADA de la lectura, para que el Detector pueda descartar lecturas de mala calidad en vez de interpretarlas como anomalía real.",
+          "enum": ["buena", "incierta", "mala"]
+        }
+      }
+    }
+  }
+}
