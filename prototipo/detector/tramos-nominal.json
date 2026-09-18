@@ -1,0 +1,16 @@
+{
+  "tramos": {
+    "tramo-14": {
+      "presionNominalBar": 45.0,
+      "caudalNominalM3h": 120.0
+    },
+    "tramo-22": {
+      "presionNominalBar": 45.0,
+      "caudalNominalM3h": 120.0
+    }
+  },
+  "_default": {
+    "presionNominalBar": 45.0,
+    "caudalNominalM3h": 120.0
+  }
+}
