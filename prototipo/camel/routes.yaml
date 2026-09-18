@@ -1,0 +1,59 @@
+- errorHandler:
+    deadLetterChannel:
+      deadLetterUri: "kafka:it.alerts.dead-letter.v1?brokers={{kafka.brokers}}"
+      redeliveryPolicy:
+        maximumRedeliveries: 3
+        redeliveryDelay: 2000
+
+- route:
+    id: enrutar-alertas-balance-volumetrico
+    from:
+      uri: "kafka:it.alerts.valve-anomaly.v1"
+      parameters:
+        brokers: "{{kafka.brokers}}"
+        groupId: "camel-integracion-balance"
+      steps:
+        - unmarshal:
+            json:
+              library: Jackson
+
+        - idempotentConsumer:
+            idempotentRepository: "#class:org.apache.camel.support.processor.idempotent.MemoryIdempotentRepository"
+            expression:
+              simple: "${body[id]}"
+            steps:
+              - wireTap:
+                  uri: "log:auditoria-alertas?level=INFO"
+
+              - choice:
+                  when:
+                    - simple: "${body[data][severidad]} == 'alta'"
+                      steps:
+                        - log:
+                            message: "Alerta ALTA en tramo ${body[data][tramoId]}: notificando de inmediato"
+                        - setProperty:
+                            name: alertaOriginal
+                            simple: "${body}"
+                        - marshal:
+                            json:
+                              library: Jackson
+                        - to:
+                            uri: "http://api:8090/notificaciones/urgente"
+                        - setBody:
+                            simple: "${exchangeProperty.alertaOriginal}"
+                  otherwise:
+                    steps:
+                      - log:
+                          message: "Alerta ${body[data][severidad]} en tramo ${body[data][tramoId]}: actualizando estado"
+
+              - setBody:
+                  simple: |
+                    {
+                      "tramo": "${body[data][tramoId]}",
+                      "descuadreM3h": ${body[data][diferenciaBalanceM3h]},
+                      "caidaPresionPct": ${body[data][caidaPresionPorcentaje]},
+                      "severidad": "${body[data][severidad]}",
+                      "detectadoEn": "${body[time]}"
+                    }
+              - to:
+                  uri: "http://api:8090/tramos/estado"
