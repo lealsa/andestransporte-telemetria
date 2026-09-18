@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Panel de Operación — AndesTransporte Telemetría</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2b;
+    --panel-2: #1e2536;
+    --border: #2a3348;
+    --text: #e7ebf3;
+    --text-dim: #9aa4bd;
+    --accent: #4f8cff;
+    --ok: #35c078;
+    --warn: #f5a623;
+    --bad: #ef5c5c;
+    --mono: "SF Mono", "Consolas", "Menlo", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .subt { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 24px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 1.02rem;
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 .badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--text-dim);
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secundario { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.peligro { background: var(--bad); }
+  button.ok { background: var(--ok); }
+  .estado-txt { font-size: 0.82rem; color: var(--text-dim); }
+  pre.logs {
+    background: #0a0e17;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    max-height: 220px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    line-height: 1.4;
+    color: #b9d3ff;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .grid-tramos { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .tramo {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .tramo .id { font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; }
+  .nivel { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; margin-bottom: 8px; }
+  .nivel.normal { background: rgba(53,192,120,0.18); color: var(--ok); }
+  .nivel.alerta_activa { background: rgba(239,92,92,0.18); color: var(--bad); }
+  .nivel.desconocido { background: rgba(154,164,189,0.18); color: var(--text-dim); }
+  .tramo .detalle { font-size: 0.72rem; color: var(--text-dim); }
+  .tramo .hora { font-weight: 400; font-size: 0.72rem; color: var(--text-dim); margin-left: 6px; font-family: var(--mono); }
+  .metricas { margin: 8px 0 6px; display: flex; flex-direction: column; gap: 3px; }
+  .metrica { display: grid; grid-template-columns: 5.2rem 5.6rem 1fr auto; gap: 8px; align-items: baseline; font-size: 0.78rem; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+  .metrica.fuera { background: rgba(239,92,92,0.14); }
+  .metrica.fuera .m-valor, .metrica.fuera .m-desv { color: var(--bad); font-weight: 700; }
+  .m-nombre { color: var(--text-dim); }
+  .m-valor { font-family: var(--mono); font-size: 0.9rem; }
+  .m-valor small { font-size: 0.65rem; color: var(--text-dim); }
+  .m-nominal, .m-desv { font-size: 0.68rem; color: var(--text-dim); font-family: var(--mono); }
+  .tramo .btns { margin-top: 10px; display: flex; gap: 6px; }
+  .tramo .btns button { flex: 1; padding: 6px 8px; font-size: 0.75rem; }
+  .links a { color: var(--accent); text-decoration: none; font-size: 0.85rem; margin-right: 16px; }
+  .links a:hover { text-decoration: underline; }
+  .resultado-esquema {
+    background: #0a0e17;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-top: 10px;
+    display: none;
+  }
+  .resultado-esquema.mostrar { display: block; }
+  .mensaje-esquema { font-weight: 700; margin-bottom: 6px; }
+  .mensaje-esquema.rechazado { color: var(--ok); }
+  .mensaje-esquema.aceptado { color: var(--bad); }
+  input[type=text] {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 0.85rem;
+  }
+  .punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .punto.on { background: var(--ok); }
+  .punto.off { background: var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Panel de Operación — AndesTransporte Telemetría</h1>
+  <div class="subt">Taller 1 · ARTI4212</div>
+
+  <div class="card">
+    <h2>1. Stack de Docker <span class="badge" id="badge-stack">—</span></h2>
+    <div class="row">
+      <button id="btn-up">Levantar stack</button>
+      <button id="btn-down" class="peligro">Bajar stack</button>
+      <button id="btn-camel" class="secundario">+ Flujo Camel</button>
+      <button id="btn-reiniciar-deteccion" class="secundario" title="docker compose restart detector api">Reiniciar detección</button>
+      <button id="btn-refrescar-estado" class="secundario">Actualizar estado</button>
+      <span class="estado-txt" id="stack-resumen"></span>
+    </div>
+    <pre class="logs" id="logs">(sin actividad todavía — pulsa "Levantar stack")</pre>
+  </div>
+
+  <div class="card">
+    <h2>2. Estado en vivo por tramo <span class="badge" id="badge-api">—</span> <span class="badge">1 muestra/s · refresco 1 s</span></h2>
+    <div class="grid-tramos" id="grid-tramos">
+      <div class="estado-txt">Esperando datos de la API (localhost:8090)...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. Control manual de la anomalía</h2>
+    <p class="estado-txt">
+      "Quitar anomalía" hace dos cosas: el simulador vuelve a lecturas normales <em>y</em> se reconoce la alerta en la API
+      (<code>POST /tramos/{id}/alertas/reconocer</code>), así la tarjeta vuelve a <code>normal</code> al instante. Si la
+      anomalía reaparece, el detector emite una alerta nueva (nuevo episodio) y la tarjeta vuelve a rojo en ~3–4 s.
+    </p>
+    <p class="estado-txt">
+      Con estos botones fuerzas (o quitas) la anomalía en un tramo específico al instante — más convincente en vivo:
+      un tramo entra en alerta y el otro sigue normal. Al levantar el stack, el panel deja el control en
+      <em>manual sin tramos</em> (todo normal) para partir siempre de un estado conocido.
+    </p>
+    <p class="estado-txt">
+      El detector compara <strong>cada muestra</strong> (1 por segundo) contra la <strong>ficha nominal fija</strong> del tramo
+      (<code>detector/tramos-nominal.json</code>: 45 bar, 120 m³/h) y confirma la anomalía tras <strong>3 muestras
+      consecutivas</strong> fuera de umbral (−10 % de presión y ≥ 8 m³/h de descuadre a la vez). Tras inyectar, la tarjeta
+      pasa a rojo en <strong>~3–4 s</strong>. No hay línea base aprendida: da igual el estado en que arranque el tramo.
+    </p>
+    <div class="row">
+      <input type="text" id="input-tramo-manual" placeholder="ej. tramo-14" />
+      <button id="btn-activar-manual">Inyectar anomalía</button>
+      <button id="btn-desactivar-manual" class="secundario">Quitar anomalía</button>
+      <button id="btn-reset-manual" class="secundario">Volver a modo automático</button>
+    </div>
+    <div class="estado-txt" id="control-estado">—</div>
+  </div>
+
+  <div class="card">
+    <h2>4. Gobierno del Schema Registry</h2>
+    <p class="estado-txt">
+      Envía al registry el esquema de telemetría con <code>data.valor</code> cambiado de <code>number</code> a
+      <code>string</code> (el cambio de ejemplo que el propio documento de gobierno declara como prohibido bajo
+      <code>BACKWARD_TRANSITIVE</code>) y muestra la respuesta cruda. Si todo está bien configurado, el registry
+      debe responder <code>is_compatible: false</code> junto con la razón (<code>TYPE_CHANGED</code> en
+      <code>data.valor</code>).
+    </p>
+    <div class="row">
+      <button id="btn-registrar-esquemas" class="secundario">1. Registrar esquemas</button>
+      <button id="btn-probar-esquema" class="ok">2. Probar cambio incompatible</button>
+      <button id="btn-ver-config-esquema" class="secundario">Ver regla configurada</button>
+    </div>
+    <p class="estado-txt">
+      "Registrar esquemas" ejecuta los cuatro <code>curl</code> de <code>docs/06-*</code> §4 (registra ambos subjects con
+      <code>schemaType: JSON</code> y fija <code>BACKWARD_TRANSITIVE</code>). Es idempotente; hace falta tras cada
+      <code>docker compose down -v</code>, porque el registry arranca vacío.
+    </p>
+    <div class="resultado-esquema" id="resultado-esquema"></div>
+  </div>
+
+  <div class="card">
+    <h2>Enlaces rápidos</h2>
+    <div class="links">
+      <a href="http://localhost:8080" target="_blank">Redpanda Console</a>
+      <a href="http://localhost:8090/docs" target="_blank">API — Swagger/OpenAPI</a>
+      <a href="http://localhost:18081/subjects" target="_blank">Schema Registry — subjects</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+async function jsonFetch(url, opciones) {
+  const r = await fetch(url, opciones);
+  let cuerpo = null;
+  try { cuerpo = await r.json(); } catch (e) {  }
+  if (!r.ok) {
+    const detalle = cuerpo && cuerpo.detail ? cuerpo.detail : r.statusText;
+    throw new Error(detalle);
+  }
+  return cuerpo;
+}
+
+async function refrescarLogs() {
+  try {
+    const datos = await jsonFetch('/api/stack/logs');
+    $('logs').textContent = (datos.logs && datos.logs.length) ? datos.logs.join('\n') : '(sin salida todavía)';
+    $('logs').scrollTop = $('logs').scrollHeight;
+    $('badge-stack').textContent = datos.corriendo ? 'EN CURSO: ' + datos.comando : (datos.comando || 'sin actividad');
+    $('btn-up').disabled = datos.corriendo;
+    $('btn-down').disabled = datos.corriendo;
+    $('btn-camel').disabled = datos.corriendo;
+    $('btn-reiniciar-deteccion').disabled = datos.corriendo;
+  } catch (e) {
+    $('badge-stack').textContent = 'panel sin conexión';
+  }
+}
+
+async function refrescarEstadoContenedores() {
+  try {
+    const datos = await jsonFetch('/api/stack/estado');
+    const total = datos.contenedores.length;
+    const arriba = datos.contenedores.filter(c => (c.State || c.Status || '').toLowerCase().includes('running')).length;
+    $('stack-resumen').textContent = total ? `${arriba}/${total} contenedores corriendo` : 'ningún contenedor detectado todavía';
+  } catch (e) {
+    $('stack-resumen').textContent = '';
+  }
+}
+
+$('btn-up').onclick = async () => {
+  try { await jsonFetch('/api/stack/up', { method: 'POST' }); } catch (e) { alert(e.message); }
+  refrescarLogs();
+};
+$('btn-down').onclick = async () => {
+  try { await jsonFetch('/api/stack/down', { method: 'POST' }); } catch (e) { alert(e.message); }
+  refrescarLogs();
+};
+$('btn-camel').onclick = async () => {
+  try { await jsonFetch('/api/stack/camel', { method: 'POST' }); } catch (e) { alert(e.message); }
+  refrescarLogs();
+};
+$('btn-reiniciar-deteccion').onclick = async () => {
+  if (!confirm('Reinicia los contenedores detector y api (~10 s). Se pierden la línea base y las alertas acumuladas; todos los tramos vuelven a "normal". ¿Continuar?')) return;
+  try { await jsonFetch('/api/stack/reiniciar-deteccion', { method: 'POST' }); } catch (e) { alert(e.message); }
+  refrescarLogs();
+  refrescarControl();
+};
+$('btn-refrescar-estado').onclick = refrescarEstadoContenedores;
+
+function resumenAlerta(ev) {
+  if (!ev || !ev.data) return 'ninguna';
+  const d = ev.data;
+  const hora = (ev.time || '').slice(11, 19);
+  const partes = [`severidad ${d.severidad}`, (d.posibleCausa || '').replaceAll('_', ' ')];
+  if (d.caidaPresionPorcentaje != null) partes.push(`caída presión ${Number(d.caidaPresionPorcentaje).toFixed(1)}% (umbral ${d.umbralPresionPorcentaje}%)`);
+  if (d.diferenciaBalanceM3h != null) partes.push(`descuadre ${Number(d.diferenciaBalanceM3h).toFixed(1)} m³/h (umbral ${d.umbralBalanceM3h})`);
+  if (Array.isArray(d.eventosOrigenIds)) partes.push(`${d.eventosOrigenIds.length} lecturas de evidencia`);
+  return `${partes.join(' · ')} · ${hora}`;
+}
+
+function fmt(v, dec = 1) { return (v == null) ? '—' : Number(v).toFixed(dec); }
+
+function filaMetrica(nombre, valor, unidad, nominal, desvTexto, fuera) {
+  return `<div class="metrica ${fuera ? 'fuera' : ''}">
+      <span class="m-nombre">${nombre}</span>
+      <span class="m-valor">${fmt(valor)} <small>${unidad}</small></span>
+      <span class="m-nominal">${nominal != null ? 'nominal ' + fmt(nominal, 0) : ''}</span>
+      <span class="m-desv">${desvTexto}</span>
+    </div>`;
+}
+
+function metricasTramo(t) {
+  const m = t.metricas || {};
+  const nom = m.nominal || {};
+  const caida = m.caidaPresionPct;
+  const desc = m.descuadreM3h;
+  const umbralP = (t.ultimaAlerta && t.ultimaAlerta.data.umbralPresionPorcentaje) || 10;
+  const umbralB = (t.ultimaAlerta && t.ultimaAlerta.data.umbralBalanceM3h) || 8;
+  return filaMetrica('Presión', m.presionBar, 'bar', nom.presionNominalBar,
+                     caida == null ? '' : (caida >= 0 ? '−' : '+') + fmt(Math.abs(caida)) + ' %', caida != null && caida >= umbralP)
+       + filaMetrica('Caudal ↑', m.caudalArribaM3h, 'm³/h', nom.caudalNominalM3h, '', false)
+       + filaMetrica('Caudal ↓', m.caudalAbajoM3h, 'm³/h', nom.caudalNominalM3h,
+                     desc == null ? '' : 'descuadre ' + fmt(desc) + ' m³/h', desc != null && desc >= umbralB)
+       + filaMetrica('Temperatura', m.temperaturaC, '°C', null, '', false);
+}
+
+function tarjetaTramo(t) {
+  const nivel = t.nivel || 'desconocido';
+  const hora = t.ultimaLectura ? (t.ultimaLectura.time || '').slice(11, 19) : '—';
+  const ultimaAlerta = resumenAlerta(t.ultimaAlerta);
+  return `
+    <div class="tramo">
+      <div class="id">${t.tramoId} <span class="hora">${hora}</span></div>
+      <span class="nivel ${nivel}">${nivel}</span>
+      <div class="metricas">${metricasTramo(t)}</div>
+      <div class="detalle">última alerta: ${ultimaAlerta}</div>
+      <div class="btns">
+        <button onclick="activarAnomalia('${t.tramoId}')">Inyectar anomalía</button>
+        <button class="secundario" onclick="desactivarAnomalia('${t.tramoId}')">Quitar anomalía</button>
+      </div>
+    </div>`;
+}
+
+async function refrescarStatus() {
+  try {
+    const datos = await jsonFetch('/api/status');
+    $('badge-api').textContent = datos.api_disponible ? 'API arriba' : 'API no disponible';
+    if (!datos.api_disponible) {
+      $('grid-tramos').innerHTML = `<div class="estado-txt">${datos.mensaje || 'API no disponible todavía.'}</div>`;
+      return;
+    }
+    if (!datos.tramos.length) {
+      $('grid-tramos').innerHTML = '<div class="estado-txt">La API está arriba pero todavía no hay datos de ningún tramo.</div>';
+      return;
+    }
+    $('grid-tramos').innerHTML = datos.tramos.map(tarjetaTramo).join('');
+  } catch (e) {
+    $('badge-api').textContent = 'panel sin conexión';
+  }
+}
+
+async function refrescarControl() {
+  try {
+    const datos = await jsonFetch('/api/anomalia/estado');
+    const lista = (datos.tramosConAnomalia || []).join(', ') || 'ninguno';
+    $('control-estado').textContent = `Modo: ${datos.modo} · Tramos forzados con anomalía: ${lista}`;
+  } catch (e) {
+    $('control-estado').textContent = '—';
+  }
+}
+
+async function activarAnomalia(tramoId) {
+  try {
+    await jsonFetch('/api/anomalia/activar', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({tramoId}) });
+  } catch (e) { alert(e.message); }
+  refrescarControl();
+}
+async function desactivarAnomalia(tramoId) {
+  try {
+    const r = await jsonFetch('/api/anomalia/desactivar', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({tramoId}) });
+    if (r.reconocimiento && r.reconocimiento.error) {
+      alert('Se quitó la anomalía en el simulador, pero no se pudo reconocer la alerta en la API: ' + r.reconocimiento.error);
+    }
+  } catch (e) { alert(e.message); }
+  refrescarControl();
+  refrescarStatus();
+}
+
+$('btn-activar-manual').onclick = () => {
+  const tramo = $('input-tramo-manual').value.trim();
+  if (tramo) activarAnomalia(tramo);
+};
+$('btn-desactivar-manual').onclick = () => {
+  const tramo = $('input-tramo-manual').value.trim();
+  if (tramo) desactivarAnomalia(tramo);
+};
+$('btn-reset-manual').onclick = async () => {
+  try { await jsonFetch('/api/anomalia/reset', { method: 'POST' }); } catch (e) { alert(e.message); }
+  refrescarControl();
+};
+
+$('btn-probar-esquema').onclick = async () => {
+  const el = $('resultado-esquema');
+  el.classList.add('mostrar');
+  el.textContent = 'Enviando el esquema incompatible al Schema Registry...';
+  try {
+    const datos = await jsonFetch('/api/esquema/probar-incompatible', { method: 'POST' });
+    const esRechazado = datos.respuesta_cruda && datos.respuesta_cruda.is_compatible === false;
+    const claseMensaje = esRechazado ? 'rechazado' : 'aceptado';
+    el.innerHTML = `<div class="mensaje-esquema ${claseMensaje}">${datos.mensaje}</div>` +
+      `HTTP ${datos.http_status}\n` + JSON.stringify(datos.respuesta_cruda, null, 2);
+  } catch (e) {
+    el.textContent = 'Error: ' + e.message;
+  }
+};
+
+$('btn-registrar-esquemas').onclick = async () => {
+  const el = $('resultado-esquema');
+  el.classList.add('mostrar');
+  el.textContent = 'Registrando esquemas y fijando la regla de compatibilidad...';
+  try {
+    const datos = await jsonFetch('/api/esquema/registrar', { method: 'POST' });
+    const clase = datos.ok ? 'rechazado' : 'aceptado';
+    el.innerHTML = `<div class="mensaje-esquema ${clase}">${datos.mensaje}</div>` +
+      datos.pasos.map(p => `HTTP ${p.http_status}  ${p.paso}: ${JSON.stringify(p.respuesta)}`).join(String.fromCharCode(10));
+  } catch (e) {
+    el.textContent = 'Error: ' + e.message;
+  }
+};
+
+$('btn-ver-config-esquema').onclick = async () => {
+  const el = $('resultado-esquema');
+  el.classList.add('mostrar');
+  try {
+    const datos = await jsonFetch('/api/esquema/estado');
+    el.textContent = JSON.stringify(datos, null, 2);
+  } catch (e) {
+    el.textContent = 'Error: ' + e.message;
+  }
+};
+
+refrescarLogs();
+refrescarEstadoContenedores();
+refrescarStatus();
+refrescarControl();
+
+setInterval(refrescarLogs, 2000);
+setInterval(refrescarEstadoContenedores, 8000);
+setInterval(refrescarStatus, 1000);
+setInterval(refrescarControl, 5000);
+</script>
+</body>
+</html>
