@@ -65,9 +65,9 @@ http://localhost:9500. Levanta y baja el stack, muestra cada tramo en vivo (pres
 
 ## Cómo funciona la detección
 
-El simulador publica cada segundo presión, caudal aguas arriba, caudal aguas abajo y temperatura por tramo. El puente valida cada lectura contra `schemas/telemetria-lectura.schema.json` y la publica en `ot.telemetry.v1` con `tramoId` como clave de partición; lo que no valida no cruza la DMZ.
+El simulador publica cada segundo presión, caudal aguas arriba, caudal aguas abajo y temperatura para cada uno de los diez tramos configurados en `docker-compose.yml`. El puente valida cada lectura contra `schemas/telemetria-lectura.schema.json` y la publica en `ot.telemetry.v1` con `tramoId` como clave de partición; lo que no valida no cruza la DMZ.
 
-El detector compara cada muestra contra la ficha nominal del tramo (`prototipo/detector/tramos-nominal.json`, 45 bar y 120 m³/h). Si la presión cae más del 10 % respecto del nominal y el descuadre entre caudales supera 8 m³/h durante 3 muestras seguidas, emite una alerta en `it.alerts.valve-anomaly.v1`, una por episodio. La alerta llega unos 4 segundos después de inyectar la anomalía. La regla está aislada en `detector/regla.py` y tiene pruebas:
+El detector compara cada muestra contra la ficha nominal del tramo (`prototipo/detector/tramos-nominal.json`, 45 bar y 120 m³/h para los diez). Si la presión cae más del 10 % respecto del nominal y el descuadre entre caudales supera 8 m³/h durante 3 muestras seguidas, emite una alerta en `it.alerts.valve-anomaly.v1`, una por episodio. La alerta llega unos 4 segundos después de inyectar la anomalía. La regla está aislada en `detector/regla.py` y tiene pruebas:
 
 ```bash
 cd prototipo/detector
@@ -80,7 +80,7 @@ Umbrales y persistencia se ajustan en `docker-compose.yml` (servicio `detector`)
 
 1. Levantar el stack y registrar los esquemas.
 2. Abrir el panel. Ambos tramos en `normal`.
-3. Inyectar la anomalía en `tramo-14`. En ~4 s pasa a `alerta_activa`; `tramo-22` sigue en `normal`. En Redpanda Console se ve el evento en `it.alerts.valve-anomaly.v1`; en `GET /tramos/tramo-14/estado`, el estado consolidado.
+3. Inyectar la anomalía en `tramo-14`. En ~4 s pasa a `alerta_activa`; los otros nueve siguen en `normal`. En Redpanda Console se ve el evento en `it.alerts.valve-anomaly.v1`; en `GET /tramos/tramo-14/estado`, el estado consolidado.
 4. Con el perfil Camel arriba, la alerta llega a `POST /notificaciones/urgente` (si es alta) y a `POST /tramos/estado`; se ve en los logs de `api-estado-tramo`.
 5. Quitar la anomalía: el tramo vuelve a `normal`.
 6. Probar el cambio incompatible: el registry responde `is_compatible: false` con `TYPE_CHANGED` en `data.valor`.

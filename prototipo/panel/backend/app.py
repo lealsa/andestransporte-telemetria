@@ -31,6 +31,9 @@ HEADERS_SR = {"Content-Type": "application/vnd.schemaregistry.v1+json"}
 
 app = FastAPI(title="Panel de Operacion - AndesTransporte Telemetria")
 
+http = requests.Session()
+http.trust_env = False
+
 
 _job_lock = threading.Lock()
 _job = {
@@ -132,7 +135,7 @@ def _reconocer_todas_las_alertas() -> None:
     import time as _time
     for _ in range(30):
         try:
-            r = requests.get(f"{API_BASE_URL}/tramos", timeout=2)
+            r = http.get(f"{API_BASE_URL}/tramos", timeout=2)
             if r.ok:
                 break
         except requests.exceptions.RequestException:
@@ -142,7 +145,7 @@ def _reconocer_todas_las_alertas() -> None:
         _agregar_log("[panel] la API no respondio tras el reinicio; las alertas historicas quedaran sin reconocer")
         return
     _time.sleep(2)
-    tramos = requests.get(f"{API_BASE_URL}/tramos", timeout=3).json().get("tramos", [])
+    tramos = http.get(f"{API_BASE_URL}/tramos", timeout=3).json().get("tramos", [])
     for tramo_id in tramos:
         res = _reconocer_alerta_en_api(tramo_id)
         _agregar_log(f"[panel] {tramo_id}: alerta historica reconocida -> nivel {res.get('nivel', '?')}")
@@ -245,7 +248,7 @@ def contenedor_logs(nombre: str, tail: int = 80):
 @app.get("/api/status", summary="Estado consolidado de todos los tramos conocidos")
 def status():
     try:
-        resp_tramos = requests.get(f"{API_BASE_URL}/tramos", timeout=3)
+        resp_tramos = http.get(f"{API_BASE_URL}/tramos", timeout=3)
         resp_tramos.raise_for_status()
         tramos_ids = resp_tramos.json().get("tramos", [])
     except requests.exceptions.RequestException:
@@ -254,7 +257,7 @@ def status():
     tramos = []
     for tramo_id in tramos_ids:
         try:
-            r = requests.get(f"{API_BASE_URL}/tramos/{tramo_id}/estado", timeout=3)
+            r = http.get(f"{API_BASE_URL}/tramos/{tramo_id}/estado", timeout=3)
             r.raise_for_status()
             tramos.append(r.json())
         except requests.exceptions.RequestException as exc:
@@ -300,7 +303,7 @@ def anomalia_activar(payload: dict = Body(..., example={"tramoId": "tramo-14"}))
 
 def _reconocer_alerta_en_api(tramo_id: str) -> dict:
     try:
-        r = requests.post(f"{API_BASE_URL}/tramos/{tramo_id}/alertas/reconocer", timeout=3)
+        r = http.post(f"{API_BASE_URL}/tramos/{tramo_id}/alertas/reconocer", timeout=3)
         return r.json() if r.ok else {"error": r.text, "status_code": r.status_code}
     except requests.exceptions.RequestException as exc:
         return {"error": str(exc)}
@@ -361,14 +364,14 @@ def esquema_registrar():
         if not ruta.exists():
             raise HTTPException(status_code=500, detail=f"No se encontro {ruta}")
         try:
-            r = requests.post(
+            r = http.post(
                 f"{SCHEMA_REGISTRY_URL}/subjects/{subject}/versions",
                 json={"schema": ruta.read_text(encoding="utf-8"), "schemaType": "JSON"},
                 headers=HEADERS_SR,
                 timeout=5,
             )
             pasos.append({"paso": f"registrar {subject}", "http_status": r.status_code, "respuesta": _json_o_texto(r)})
-            r = requests.put(
+            r = http.put(
                 f"{SCHEMA_REGISTRY_URL}/config/{subject}",
                 json={"compatibility": COMPATIBILIDAD},
                 headers=HEADERS_SR,
@@ -394,7 +397,7 @@ def esquema_estado():
     salida = {}
     for subject in (SUBJECT_TELEMETRIA, SUBJECT_ALERTAS):
         try:
-            r = requests.get(f"{SCHEMA_REGISTRY_URL}/config/{subject}", timeout=3)
+            r = http.get(f"{SCHEMA_REGISTRY_URL}/config/{subject}", timeout=3)
             salida[subject] = r.json() if r.ok else {"error": r.text, "status_code": r.status_code}
         except requests.exceptions.RequestException as exc:
             salida[subject] = {"error": str(exc)}
@@ -423,7 +426,7 @@ def esquema_probar_incompatible():
     body = {"schema": json.dumps(esquema_incompatible), "schemaType": "JSON"}
 
     try:
-        r = requests.post(url, json=body, headers=HEADERS_SR, timeout=5)
+        r = http.post(url, json=body, headers=HEADERS_SR, timeout=5)
     except requests.exceptions.RequestException as exc:
         raise HTTPException(status_code=502, detail=f"No se pudo contactar al Schema Registry en {SCHEMA_REGISTRY_URL}: {exc}")
 

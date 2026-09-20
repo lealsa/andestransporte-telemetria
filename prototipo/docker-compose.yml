@@ -29,6 +29,15 @@ services:
       retries: 20
       start_period: 10s
 
+  topics:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.7
+    container_name: topics-init
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command: -c "rpk topic create ot.telemetry.v1 it.alerts.valve-anomaly.v1 it.alerts.dead-letter.v1 -p 6 -r 1 --brokers redpanda:9092 || true"
+
   redpanda-console:
     image: docker.redpanda.com/redpandadata/console:v2.7.2
     container_name: redpanda-console
@@ -88,6 +97,8 @@ services:
     container_name: puente-ot-it
     restart: unless-stopped
     depends_on:
+      topics:
+        condition: service_completed_successfully
       mosquitto:
         condition: service_healthy
       redpanda:
@@ -105,6 +116,8 @@ services:
     container_name: detector-anomalias
     restart: unless-stopped
     depends_on:
+      topics:
+        condition: service_completed_successfully
       redpanda:
         condition: service_healthy
     environment:
@@ -123,6 +136,8 @@ services:
     container_name: api-estado-tramo
     restart: unless-stopped
     depends_on:
+      topics:
+        condition: service_completed_successfully
       redpanda:
         condition: service_healthy
     environment:
