@@ -1,5 +1,37 @@
 {
   "tramos": {
+    "tramo-01": {
+      "presionNominalBar": 45.0,
+      "caudalNominalM3h": 120.0
+    },
+    "tramo-02": {
+      "presionNominalBar": 45.0,
+      "caudalNominalM3h": 120.0
+    },
+    "tramo-03": {
+      "presionNominalBar": 45.0,
+      "caudalNominalM3h": 120.0
+    },
+    "tramo-04": {
+      "presionNominalBar": 45.0,
+      "caudalNominalM3h": 120.0
+    },
+    "tramo-05": {
+      "presionNominalBar": 45.0,
+      "caudalNominalM3h": 120.0
+    },
+    "tramo-06": {
+      "presionNominalBar": 45.0,
+      "caudalNominalM3h": 120.0
+    },
+    "tramo-07": {
+      "presionNominalBar": 45.0,
+      "caudalNominalM3h": 120.0
+    },
+    "tramo-08": {
+      "presionNominalBar": 45.0,
+      "caudalNominalM3h": 120.0
+    },
     "tramo-14": {
       "presionNominalBar": 45.0,
       "caudalNominalM3h": 120.0

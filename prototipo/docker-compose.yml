@@ -76,7 +76,7 @@ services:
       PYTHONUNBUFFERED: "1"
       MQTT_HOST: mosquitto
       MQTT_PORT: "1883"
-      TRAMOS: "tramo-14,tramo-22"
+      TRAMOS: "tramo-01,tramo-02,tramo-03,tramo-04,tramo-05,tramo-06,tramo-07,tramo-08,tramo-14,tramo-22"
       INTERVALO_SEG: "1"
       INYECTAR_ANOMALIA_A_LOS_SEG: "90"
       CONTROL_FILE: /control/anomalias.json
