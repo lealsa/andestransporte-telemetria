@@ -40,23 +40,52 @@ def registrar():
     return ok
 
 
-def probar_incompatible():
-    esquema = json.loads(SUBJECTS["ot.telemetry.v1-value"].read_text(encoding="utf-8"))
-    esquema["properties"]["data"]["properties"]["valor"]["type"] = "string"
-    status, resp = llamar("POST", "/compatibility/subjects/ot.telemetry.v1-value/versions/latest?verbose=true",
-                          {"schema": json.dumps(esquema), "schemaType": "JSON"})
-    mensajes = [m for m in resp.get("messages", []) if not str(m).startswith("{oldSchema:")]
-    print(f"{status} data.valor number -> string: is_compatible={resp.get('is_compatible')}")
-    for m in mensajes:
-        print(f"    {m}")
-    return resp.get("is_compatible") is False
+def _agregar_opcional(data):
+    data["properties"]["firmware"] = {"type": "string"}
+
+
+def _ampliar_enum(data):
+    data["properties"]["calidadSenal"]["enum"].append("desconocida")
+
+
+def _restringir_enum(data):
+    data["properties"]["calidadSenal"]["enum"].remove("incierta")
+
+
+def _cambiar_tipo(data):
+    data["properties"]["valor"]["type"] = "string"
+
+
+CAMBIOS = [
+    ("agregar campo opcional data.firmware", _agregar_opcional, True),
+    ("ampliar enum calidadSenal con 'desconocida'", _ampliar_enum, True),
+    ("quitar 'incierta' del enum calidadSenal", _restringir_enum, False),
+    ("data.valor number -> string", _cambiar_tipo, False),
+]
+
+
+def probar_cambios():
+    ok = True
+    for nombre, cambio, esperado in CAMBIOS:
+        esquema = json.loads(SUBJECTS["ot.telemetry.v1-value"].read_text(encoding="utf-8"))
+        cambio(esquema["properties"]["data"])
+        status, resp = llamar("POST", "/compatibility/subjects/ot.telemetry.v1-value/versions/latest?verbose=true",
+                              {"schema": json.dumps(esquema), "schemaType": "JSON"})
+        compatible = resp.get("is_compatible")
+        veredicto = "ACEPTADO" if compatible else "RECHAZADO"
+        print(f"{status} {nombre}: {veredicto} (is_compatible={compatible})")
+        for m in resp.get("messages", []):
+            if not str(m).startswith("{oldSchema:"):
+                print(f"    {m}")
+        ok &= compatible is esperado
+    return ok
 
 
 if __name__ == "__main__":
     try:
         exito = registrar()
         if "--probar" in sys.argv:
-            exito &= probar_incompatible()
+            exito &= probar_cambios()
     except urllib.error.URLError as e:
         print(f"no se pudo conectar al Schema Registry en {REGISTRY}: {e.reason}")
         sys.exit(2)

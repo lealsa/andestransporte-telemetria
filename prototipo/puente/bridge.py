@@ -1,5 +1,7 @@
 import json
 import os
+import time
+import urllib.request
 import uuid
 from datetime import datetime, timezone
 
@@ -11,12 +13,24 @@ MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 KAFKA_BROKERS = os.getenv("KAFKA_BROKERS", "redpanda:9092")
 TOPIC_TELEMETRIA = "ot.telemetry.v1"
-SCHEMA_PATH = os.getenv("SCHEMA_PATH", "/app/schemas/telemetria-lectura.schema.json")
-
-with open(SCHEMA_PATH) as f:
-    SCHEMA = json.load(f)
+SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://redpanda:8081")
+SUBJECT = f"{TOPIC_TELEMETRIA}-value"
 
 
+def obtener_esquema_vigente() -> tuple[int, dict]:
+    url = f"{SCHEMA_REGISTRY_URL}/subjects/{SUBJECT}/versions/latest"
+    while True:
+        try:
+            with urllib.request.urlopen(url, timeout=5) as r:
+                resp = json.loads(r.read())
+            return resp["version"], json.loads(resp["schema"])
+        except Exception as exc:
+            print(f"[puente] sin esquema vigente para {SUBJECT} en {SCHEMA_REGISTRY_URL} ({exc}); no se publica nada, reintento en 5 s")
+            time.sleep(5)
+
+
+VERSION_ESQUEMA, SCHEMA = obtener_esquema_vigente()
+print(f"[puente] validando contra {SUBJECT} version {VERSION_ESQUEMA} del Schema Registry")
 VALIDADOR = Draft202012Validator(SCHEMA)
 
 productor = KafkaProducer(
@@ -82,7 +96,7 @@ def al_desconectar(client, userdata, rc):
 
 
 def main() -> None:
-    cliente = mqtt.Client(client_id="puente-ot-it")
+    cliente = mqtt.Client(client_id="puente-ot-it", clean_session=False)
     cliente.on_connect = al_conectar
     cliente.on_disconnect = al_desconectar
     cliente.on_message = al_recibir_mensaje

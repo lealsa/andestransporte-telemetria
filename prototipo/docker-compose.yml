@@ -4,6 +4,7 @@ services:
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v24.2.7
     container_name: redpanda
+    restart: unless-stopped
     command:
       - redpanda
       - start
@@ -41,6 +42,7 @@ services:
   redpanda-console:
     image: docker.redpanda.com/redpandadata/console:v2.7.2
     container_name: redpanda-console
+    restart: unless-stopped
     entrypoint: /bin/sh
     command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
     environment:
@@ -64,8 +66,10 @@ services:
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: mosquitto
+    restart: unless-stopped
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
     ports:
       - "1883:1883"
     healthcheck:
@@ -108,8 +112,7 @@ services:
       MQTT_HOST: mosquitto
       MQTT_PORT: "1883"
       KAFKA_BROKERS: redpanda:9092
-    volumes:
-      - ../schemas:/app/schemas:ro
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
 
   detector:
     build: ./detector
@@ -152,6 +155,7 @@ services:
   camel:
     build: ./camel
     container_name: camel-integracion-balance
+    restart: unless-stopped
     depends_on:
       redpanda:
         condition: service_healthy
@@ -163,3 +167,4 @@ services:
 
 volumes:
   detector-data:
+  mosquitto-data:

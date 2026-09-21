@@ -5,9 +5,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/root/.jbang/bin:${PATH}"
+ENV JBANG_DEFAULT_JAVA_VERSION=17
 
 RUN jbang trust add https://github.com/apache/
 WORKDIR /app
 COPY routes.yaml application.properties ./
 
-CMD ["jbang", "-Dcamel.jbang.version=4.4.0", "camel@apache/camel", "run", "routes.yaml", "--properties=application.properties"]
+CMD ["jbang", "--java", "17", "-Dcamel.jbang.version=4.4.0", "camel@apache/camel", "run", "routes.yaml", "--properties=application.properties"]

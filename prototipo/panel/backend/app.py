@@ -1,7 +1,9 @@
 import json
 import os
+import re
 import subprocess
 import threading
+import time
 from collections import deque
 from copy import deepcopy
 from pathlib import Path
@@ -28,6 +30,7 @@ ESQUEMA_TELEMETRIA_PATH = REPO_DIR / "schemas" / "telemetria-lectura.schema.json
 ESQUEMA_ALERTAS_PATH = REPO_DIR / "schemas" / "alerta-anomalia.schema.json"
 COMPATIBILIDAD = "BACKWARD_TRANSITIVE"
 HEADERS_SR = {"Content-Type": "application/vnd.schemaregistry.v1+json"}
+ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 app = FastAPI(title="Panel de Operacion - AndesTransporte Telemetria")
 
@@ -241,7 +244,7 @@ def contenedor_logs(nombre: str, tail: int = 80):
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=504, detail="docker logs no respondio a tiempo.")
     salida = (resultado.stdout or "") + (resultado.stderr or "")
-    lineas = salida.splitlines()
+    lineas = ANSI.sub("", salida).splitlines()
     return {"nombre": nombre, "lineas": lineas[-tail:], "codigo_salida": resultado.returncode}
 
 
@@ -279,7 +282,14 @@ def _escribir_control(datos: dict) -> None:
     CONTROL_DIR.mkdir(parents=True, exist_ok=True)
     tmp = CONTROL_FILE.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, CONTROL_FILE)
+    for intento in range(20):
+        try:
+            os.replace(tmp, CONTROL_FILE)
+            return
+        except PermissionError:
+            time.sleep(0.05)
+    CONTROL_FILE.write_text(tmp.read_text(encoding="utf-8"), encoding="utf-8")
+    tmp.unlink(missing_ok=True)
 
 
 @app.get("/api/anomalia/estado", summary="Estado actual del control manual de anomalias")

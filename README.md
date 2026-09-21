@@ -33,7 +33,7 @@ docker compose up -d --build
 python registrar-esquemas.py
 ```
 
-El primer arranque tarda un par de minutos (descarga de imágenes y build). El registry arranca vacío, por eso el segundo comando: registra los dos esquemas con `schemaType: JSON` y fija `BACKWARD_TRANSITIVE`. Con `--probar` además envía un cambio incompatible (`data.valor` de `number` a `string`) y muestra el rechazo del registry.
+El primer arranque tarda un par de minutos (descarga de imágenes y build). El registry arranca vacío, por eso el segundo comando: registra los dos esquemas con `schemaType: JSON` y fija `BACKWARD_TRANSITIVE`. Hasta que no existan, el puente no publica nada. Con `--probar` además consulta al registry, sin registrar nada, cuatro cambios candidatos: acepta los compatibles (agregar un campo opcional, ampliar un enum) y rechaza los que rompen a los consumidores (restringir un enum, `data.valor` de `number` a `string`).
 
 Servicios:
 
@@ -65,7 +65,7 @@ http://localhost:9500. Levanta y baja el stack, muestra cada tramo en vivo (pres
 
 ## Cómo funciona la detección
 
-El simulador publica cada segundo presión, caudal aguas arriba, caudal aguas abajo y temperatura para cada uno de los diez tramos configurados en `docker-compose.yml`. El puente valida cada lectura contra `schemas/telemetria-lectura.schema.json` y la publica en `ot.telemetry.v1` con `tramoId` como clave de partición; lo que no valida no cruza la DMZ.
+El simulador publica cada segundo presión, caudal aguas arriba, caudal aguas abajo y temperatura para cada uno de los diez tramos configurados en `docker-compose.yml`. Al arrancar, el puente descarga del Schema Registry la versión vigente de `ot.telemetry.v1-value`, valida cada lectura contra ella y la publica en `ot.telemetry.v1` con `tramoId` como clave de partición; lo que no valida no cruza la DMZ.
 
 El detector compara cada muestra contra la ficha nominal del tramo (`prototipo/detector/tramos-nominal.json`, 45 bar y 120 m³/h para los diez). Si la presión cae más del 10 % respecto del nominal y el descuadre entre caudales supera 8 m³/h durante 3 muestras seguidas, emite una alerta en `it.alerts.valve-anomaly.v1`, una por episodio. La alerta llega unos 4 segundos después de inyectar la anomalía. La regla está aislada en `detector/regla.py` y tiene pruebas:
 
@@ -79,7 +79,7 @@ Umbrales y persistencia se ajustan en `docker-compose.yml` (servicio `detector`)
 ## Demo
 
 1. Levantar el stack y registrar los esquemas.
-2. Abrir el panel. Ambos tramos en `normal`.
+2. Abrir el panel. Los diez tramos en `normal`.
 3. Inyectar la anomalía en `tramo-14`. En ~4 s pasa a `alerta_activa`; los otros nueve siguen en `normal`. En Redpanda Console se ve el evento en `it.alerts.valve-anomaly.v1`; en `GET /tramos/tramo-14/estado`, el estado consolidado.
 4. Con el perfil Camel arriba, la alerta llega a `POST /notificaciones/urgente` (si es alta) y a `POST /tramos/estado`; se ve en los logs de `api-estado-tramo`.
 5. Quitar la anomalía: el tramo vuelve a `normal`.

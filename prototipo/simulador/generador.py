@@ -63,13 +63,24 @@ def main() -> None:
     if CONTROL_FILE:
         print(f"[generador] control manual habilitado via {CONTROL_FILE} (Panel de Operacion) — tiene prioridad sobre el modo automatico")
 
+    aviso_automatico = False
+    forzados_previos = None
+
     while True:
         transcurrido = time.time() - inicio
+        control = leer_control()
         if not anomalia_automatica_activa and transcurrido >= INYECTAR_A_LOS_SEG:
             anomalia_automatica_activa = True
+        if control is None and anomalia_automatica_activa and not aviso_automatico:
+            aviso_automatico = True
             print("[generador] *** INYECTANDO ANOMALIA AUTOMATICA: caida de presion + descuadre de balance (todos los tramos) ***")
-
-        control = leer_control()
+        if control is not None:
+            forzados = sorted(control.get("tramosConAnomalia", []))
+            if forzados != forzados_previos:
+                print(f"[generador] modo manual: anomalia en {', '.join(forzados) if forzados else 'ningun tramo'}")
+                forzados_previos = forzados
+        else:
+            forzados_previos = None
 
         for tramo_id in TRAMOS:
             if control is not None:
